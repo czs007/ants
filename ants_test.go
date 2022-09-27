@@ -23,6 +23,7 @@
 package ants
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"runtime"
@@ -561,6 +562,53 @@ func TestInfinitePool(t *testing.T) {
 	if err != ErrInvalidPreAllocSize {
 		t.Errorf("expect ErrInvalidPreAllocSize but got %v", err)
 	}
+}
+
+func TestWithDisablePurge(t *testing.T) {
+	numWorker := 2
+	p, _ := NewPool(numWorker, WithDisablePurge(true))
+	_ = p.Submit(func() {
+		fmt.Println("work1")
+		time.Sleep(time.Second)
+	})
+
+	_ = p.Submit(func() {
+		fmt.Println("work2")
+		time.Sleep(time.Second)
+	})
+
+	if n := p.Running(); n != 2 {
+		t.Errorf("expect 2 workers running, but got %d", n)
+	}
+
+	if n := p.Free(); n != 0 {
+		t.Errorf("expect zero of free workers, but got %d", n)
+	}
+
+	p.Tune(10)
+	if capacity := p.Cap(); capacity != 10 {
+		t.Fatalf("expect capacity: 10 but got %d", capacity)
+	}
+
+	_ = p.Submit(func() {
+		fmt.Println("work3")
+		time.Sleep(time.Second)
+	})
+
+	if n := p.Running(); n != 3 {
+		t.Errorf("expect 3 workers running, but got %d", n)
+	}
+
+	if n := p.Free(); n != 7 {
+		t.Errorf("expect 7 of free workers, but got %d", n)
+	}
+
+	p.Release()
+	p.Reboot()
+	if n := p.Running(); n != 3 {
+		t.Errorf("expect 3 workers running, but got %d", n)
+	}
+
 }
 
 func TestInfinitePoolWithFunc(t *testing.T) {
